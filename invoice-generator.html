@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice Generator</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy: #0C1F3F; --green: #1D9E75; --border: #e2e0d8;
+  --muted: #888780; --text: #1a1a18; --bg: #f0ede8; --white: #ffffff;
+  --font: 'DM Sans', sans-serif;
+}
+body { font-family: var(--font); background: var(--bg); color: var(--text); }
+.app { display: flex; height: 100vh; }
+
+.sidebar {
+  width: 460px; min-width: 460px; background: var(--white);
+  border-right: 1px solid var(--border); display: flex; flex-direction: column;
+  height: 100vh; position: sticky; top: 0; overflow: hidden;
+}
+.sidebar-header { padding: 1.25rem 1.75rem 1rem; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+.sidebar-header h1 { font-size: 15px; font-weight: 600; }
+.sidebar-header p { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.form-body { padding: 1.1rem 1.75rem; flex: 1; overflow-y: auto; }
+.section { margin-bottom: 1.5rem; }
+.section-title {
+  font-size: 9.5px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.9px; color: var(--muted); margin-bottom: 9px;
+  padding-bottom: 5px; border-bottom: 1px solid var(--border);
+}
+.field { margin-bottom: 9px; }
+.field label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 3px; font-weight: 500; }
+.field input, .field textarea {
+  width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 6px;
+  font-family: var(--font); font-size: 13px; color: var(--text); background: var(--white);
+  outline: none; transition: border-color 0.15s; resize: none;
+}
+.field input:focus, .field textarea:focus { border-color: var(--navy); }
+.field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.field-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 9px; }
+
+.logo-upload-area {
+  border: 1.5px dashed var(--border); border-radius: 8px; padding: 14px;
+  display: flex; align-items: center; gap: 12px; cursor: pointer;
+  transition: border-color 0.15s, background 0.15s; background: #faf9f7;
+}
+.logo-upload-area:hover { border-color: var(--navy); background: #f4f2ef; }
+.logo-preview-thumb { width: 48px; height: 48px; border-radius: 7px; border: 1px solid var(--border); object-fit: contain; background: white; display: none; }
+.logo-placeholder { width: 48px; height: 48px; border-radius: 7px; border: 1px solid var(--border); background: white; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #ccc; flex-shrink: 0; }
+.logo-upload-text { flex: 1; }
+.logo-upload-text strong { font-size: 12.5px; font-weight: 500; color: var(--text); display: block; }
+.logo-upload-text span { font-size: 11px; color: var(--muted); }
+.logo-remove-btn { font-size: 11px; color: #c0392b; background: none; border: none; cursor: pointer; padding: 3px 7px; border-radius: 4px; display: none; transition: background 0.15s; }
+.logo-remove-btn:hover { background: #fdecea; }
+#logoInput { display: none; }
+
+.items-list { display: flex; flex-direction: column; gap: 8px; }
+.item-row { background: #faf9f7; border: 1px solid var(--border); border-radius: 7px; padding: 10px; position: relative; }
+.item-row .field { margin-bottom: 6px; }
+.item-row .field:last-child { margin-bottom: 0; }
+.item-remove { position: absolute; top: 8px; right: 8px; width: 20px; height: 20px; border: none; background: none; cursor: pointer; color: #ccc; font-size: 16px; border-radius: 3px; display: flex; align-items: center; justify-content: center; transition: color 0.15s, background 0.15s; }
+.item-remove:hover { color: #c0392b; background: #fdecea; }
+.btn-add-item { margin-top: 8px; width: 100%; padding: 8px; border: 1px dashed var(--border); border-radius: 7px; background: none; font-family: var(--font); font-size: 12px; color: var(--muted); cursor: pointer; transition: all 0.15s; }
+.btn-add-item:hover { border-color: var(--navy); color: var(--navy); background: #f0f2f5; }
+
+.sidebar-footer { padding: 0.9rem 1.75rem 1.3rem; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; flex-shrink: 0; }
+.btn-pdf { width: 100%; padding: 11px; background: var(--navy); color: white; border: none; border-radius: 7px; font-family: var(--font); font-size: 13px; font-weight: 600; cursor: pointer; transition: opacity 0.15s; }
+.btn-pdf:hover { opacity: 0.87; }
+.btn-pdf:disabled { opacity: 0.6; cursor: wait; }
+.btn-reset { width: 100%; padding: 8px; background: none; color: var(--muted); border: 1px solid var(--border); border-radius: 7px; font-family: var(--font); font-size: 12px; cursor: pointer; transition: all 0.15s; }
+.btn-reset:hover { border-color: var(--muted); color: var(--text); }
+
+.preview-pane { flex: 1; display: flex; align-items: flex-start; justify-content: center; padding: 2rem; overflow-y: auto; }
+
+.invoice { width: 680px; min-width: 680px; background: var(--white); border-radius: 14px; overflow: hidden; box-shadow: 0 2px 24px rgba(0,0,0,0.09), 0 1px 3px rgba(0,0,0,0.06); font-family: var(--font); }
+
+.inv-header { background-color: #0C1F3F; padding: 1.8rem 2.25rem; display: flex; justify-content: space-between; align-items: flex-start; }
+.inv-header-left { display: flex; align-items: center; gap: 12px; }
+#p-logoImg { height: 44px; max-width: 120px; object-fit: contain; border-radius: 6px; display: none; }
+.inv-logo-icon { width: 22px; height: 22px; border: 2px solid rgba(255,255,255,0.4); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 8px; color: rgba(255,255,255,0.55); flex-shrink: 0; }
+.inv-logo-name { font-size: 19px; font-weight: 600; color: #ffffff; letter-spacing: -0.2px; }
+.inv-logo-sub { font-size: 12px; color: rgba(255,255,255,0.5); margin-top: 4px; }
+.inv-badge { background-color: #1D9E75; color: #ffffff; font-size: 10.5px; font-weight: 600; padding: 5px 13px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; }
+
+.inv-body { padding: 1.75rem 2.25rem; }
+.inv-meta-row { display: flex; justify-content: space-between; margin-bottom: 1.5rem; padding-bottom: 1.4rem; border-bottom: 1px solid var(--border); }
+.inv-meta-right { text-align: right; }
+.inv-lbl { font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 4px; }
+.inv-val { font-size: 14px; font-weight: 600; color: var(--text); }
+.inv-val-sm { font-size: 11px; color: var(--muted); margin-top: 5px; }
+.inv-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); }
+.party-name { font-size: 14.5px; font-weight: 600; color: var(--text); margin-bottom: 5px; }
+.party-detail { font-size: 12px; color: var(--muted); line-height: 1.65; }
+.inv-table { width: 100%; border-collapse: collapse; }
+.inv-table th { font-size: 9.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; padding: 7px 0; border-bottom: 1px solid var(--border); text-align: left; font-weight: 600; }
+.inv-table th.r, .inv-table td.r { text-align: right; }
+.inv-table td { font-size: 13px; color: var(--text); padding: 12px 0; border-bottom: 1px solid var(--border); vertical-align: top; font-weight: 500; }
+.inv-table td .sub { font-size: 11.5px; color: var(--muted); margin-top: 3px; font-weight: 400; }
+.inv-total-row { display: flex; justify-content: space-between; align-items: baseline; padding: 13px 0; border-top: 1px solid var(--border); margin-bottom: 1.4rem; }
+.inv-total-label { font-size: 15px; font-weight: 600; color: var(--text); }
+.inv-total-amt { font-size: 17px; font-weight: 600; color: var(--text); }
+.inv-pay-box { background-color: #f5f3ee; border-radius: 9px; padding: 1rem 1.35rem; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.4rem; }
+.inv-pay-left { display: flex; align-items: center; gap: 9px; }
+.inv-dot { width: 9px; height: 9px; border-radius: 50%; background-color: #1D9E75; flex-shrink: 0; }
+.inv-pay-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.inv-pay-sub { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+.inv-pay-amt { font-size: 21px; font-weight: 600; color: var(--text); }
+.inv-note { font-size: 12px; color: var(--muted); line-height: 1.7; border-left: 2.5px solid #ddd; padding-left: 1rem; }
+.inv-footer { background-color: #0C1F3F; padding: 0.9rem 2.25rem; display: flex; justify-content: space-between; align-items: center; margin-top: 1.75rem; }
+.inv-footer-txt { font-size: 11.5px; color: rgba(255,255,255,0.55); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>Invoice Generator</h1>
+      <p>Edit details → live preview → Download PDF</p>
+    </div>
+    <div class="form-body">
+
+      <div class="section">
+        <div class="section-title">Your Company</div>
+        <div class="field">
+          <label>Company logo</label>
+          <div class="logo-upload-area" id="logoUploadArea" onclick="document.getElementById('logoInput').click()">
+            <div class="logo-placeholder" id="logoPlaceholder">🖼</div>
+            <img id="logoThumb" class="logo-preview-thumb" src="" alt="Logo preview">
+            <div class="logo-upload-text">
+              <strong id="logoUploadLabel">Click to upload logo</strong>
+              <span>PNG, JPG, SVG — shown beside company name</span>
+            </div>
+            <button class="logo-remove-btn" id="logoRemoveBtn" onclick="removeLogo(event)">Remove</button>
+          </div>
+          <input type="file" id="logoInput" accept="image/*" onchange="handleLogo(event)">
+        </div>
+        <div class="field-row">
+          <div class="field"><label>Company name</label><input type="text" id="fromName" value="NovaTech Solutions" oninput="update()"></div>
+          <div class="field"><label>Tagline</label><input type="text" id="fromTagline" value="Software & Digital Services" oninput="update()"></div>
+        </div>
+        <div class="field"><label>Address</label><textarea id="fromAddress" rows="2" oninput="update()">123 Tech Park, Floor 4
+Dhaka, Bangladesh</textarea></div>
+        <div class="field-row">
+          <div class="field"><label>Email</label><input type="text" id="fromEmail" value="billing@novatech.io" oninput="update()"></div>
+          <div class="field"><label>Website / Phone (footer)</label><input type="text" id="fromContact" value="novatech.io · +880 1700-000000" oninput="update()"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Client</div>
+        <div class="field"><label>Client name</label><input type="text" id="toName" value="Acme Corporation Ltd." oninput="update()"></div>
+        <div class="field"><label>Address</label><textarea id="toAddress" rows="2" oninput="update()">45 Business Avenue
+Dhaka, Bangladesh</textarea></div>
+        <div class="field"><label>Email</label><input type="text" id="toEmail" value="accounts@acmecorp.com" oninput="update()"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Invoice Details</div>
+        <div class="field-row3">
+          <div class="field"><label>Invoice no.</label><input type="text" id="invoiceNo" value="INV-2026-0047" oninput="update()"></div>
+          <div class="field"><label>Issue date</label><input type="date" id="issueDate" oninput="update()"></div>
+          <div class="field"><label>Payment date</label><input type="date" id="paymentDate" oninput="update()"></div>
+        </div>
+        <div class="field" style="width:33%"><label>Currency symbol</label><input type="text" id="currency" value="$" oninput="update()"></div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Line Items</div>
+        <div class="items-list" id="itemsList"></div>
+        <button class="btn-add-item" onclick="addItem()">+ Add item</button>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Payment</div>
+        <div class="field-row">
+          <div class="field"><label>Payment method</label><input type="text" id="payMethod" value="Bank Transfer" oninput="update()"></div>
+          <div class="field"><label>Transaction reference</label><input type="text" id="payRef" value="TXN-8821-XK" oninput="update()"></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="sidebar-footer">
+      <button class="btn-pdf" id="pdfBtn" onclick="generatePDF()">⬇ Download PDF</button>
+      <button class="btn-reset" onclick="resetForm()">Reset to defaults</button>
+    </div>
+  </aside>
+
+  <div class="preview-pane">
+    <div class="invoice" id="invoice">
+      <div class="inv-header">
+        <div>
+          <div class="inv-header-left">
+            <img id="p-logoImg" src="" alt="Logo">
+            <div id="p-logoIcon" class="inv-logo-icon">▣</div>
+            <div class="inv-logo-name" id="p-fromName">NovaTech Solutions</div>
+          </div>
+          <div class="inv-logo-sub" id="p-fromTagline">Software &amp; Digital Services</div>
+        </div>
+        <div class="inv-badge">✓ Payment Received</div>
+      </div>
+      <div class="inv-body">
+        <div class="inv-meta-row">
+          <div>
+            <div class="inv-lbl">Receipt / Invoice no.</div>
+            <div class="inv-val" id="p-invoiceNo">#INV-2026-0047</div>
+          </div>
+          <div class="inv-meta-right">
+            <div class="inv-lbl">Issue date</div>
+            <div class="inv-val" id="p-issueDate">—</div>
+            <div class="inv-val-sm" id="p-paymentDate"></div>
+          </div>
+        </div>
+        <div class="inv-parties">
+          <div>
+            <div class="inv-lbl">From</div>
+            <div class="party-name" id="p-fromName2">NovaTech Solutions</div>
+            <div class="party-detail" id="p-fromDetail"></div>
+          </div>
+          <div>
+            <div class="inv-lbl">Billed to</div>
+            <div class="party-name" id="p-toName">Acme Corporation Ltd.</div>
+            <div class="party-detail" id="p-toDetail"></div>
+          </div>
+        </div>
+        <table class="inv-table">
+          <thead><tr><th style="width:72%">Description</th><th class="r" style="width:28%">Amount</th></tr></thead>
+          <tbody id="p-items"></tbody>
+        </table>
+        <div class="inv-total-row">
+          <span class="inv-total-label">Total paid</span>
+          <span class="inv-total-amt" id="p-total">$0.00</span>
+        </div>
+        <div class="inv-pay-box">
+          <div class="inv-pay-left">
+            <div class="inv-dot"></div>
+            <div>
+              <div class="inv-pay-label">Payment confirmed</div>
+              <div class="inv-pay-sub" id="p-payInfo">Bank Transfer · Ref: TXN-8821-XK</div>
+            </div>
+          </div>
+          <div class="inv-pay-amt" id="p-total2">$0.00</div>
+        </div>
+        <div class="inv-note">Thank you for your payment. This document serves as an official confirmation that the above amount has been received in full. Please retain this receipt for your records.</div>
+      </div>
+      <div class="inv-footer">
+        <div class="inv-footer-txt" id="p-footerLeft">novatech.io · +880 1700-000000</div>
+        <div class="inv-footer-txt" id="p-footerRight">billing@novatech.io</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+let items = [
+  { title: 'Web Application Development', desc: 'Custom dashboard & admin panel (Phase 1)', amount: '2500' },
+  { title: 'API Integration', desc: 'Third-party payment gateway & CRM sync', amount: '800' },
+  { title: 'Monthly Maintenance & Support', desc: 'May 2026 — bug fixes, updates, uptime monitoring', amount: '200' },
+];
+let logoDataURL = null;
+
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function nl2br(s){return esc(s).replace(/\n/g,'<br>');}
+function fmt(n,sym){return sym+parseFloat(n||0).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});}
+function fmtDate(v){if(!v)return '';const d=new Date(v+'T00:00:00');return d.toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});}
+
+function handleLogo(e){
+  const file=e.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=function(ev){
+    logoDataURL=ev.target.result;
+    const thumb=document.getElementById('logoThumb');
+    thumb.src=logoDataURL; thumb.style.display='block';
+    document.getElementById('logoPlaceholder').style.display='none';
+    document.getElementById('logoUploadLabel').textContent=file.name;
+    document.getElementById('logoRemoveBtn').style.display='inline-block';
+    const img=document.getElementById('p-logoImg');
+    img.src=logoDataURL; img.style.display='block';
+    document.getElementById('p-logoIcon').style.display='none';
+  };
+  reader.readAsDataURL(file);
+}
+function removeLogo(e){
+  e.stopPropagation(); logoDataURL=null;
+  document.getElementById('logoInput').value='';
+  document.getElementById('logoThumb').style.display='none';
+  document.getElementById('logoThumb').src='';
+  document.getElementById('logoPlaceholder').style.display='flex';
+  document.getElementById('logoUploadLabel').textContent='Click to upload logo';
+  document.getElementById('logoRemoveBtn').style.display='none';
+  document.getElementById('p-logoImg').style.display='none';
+  document.getElementById('p-logoImg').src='';
+  document.getElementById('p-logoIcon').style.display='inline-flex';
+}
+
+function renderItems(){
+  const list=document.getElementById('itemsList'); list.innerHTML='';
+  items.forEach((item,i)=>{
+    const div=document.createElement('div'); div.className='item-row';
+    div.innerHTML=`
+      <button class="item-remove" onclick="removeItem(${i})">×</button>
+      <div class="field"><label>Service title</label><input type="text" value="${esc(item.title)}" oninput="items[${i}].title=this.value;updatePreview()"></div>
+      <div class="field"><label>Description (optional)</label><input type="text" value="${esc(item.desc)}" oninput="items[${i}].desc=this.value;updatePreview()"></div>
+      <div class="field"><label>Amount</label><input type="number" value="${item.amount}" min="0" step="0.01" oninput="items[${i}].amount=this.value;updatePreview()"></div>`;
+    list.appendChild(div);
+  });
+}
+function addItem(){items.push({title:'',desc:'',amount:''});renderItems();updatePreview();}
+function removeItem(i){items.splice(i,1);renderItems();updatePreview();}
+
+function updatePreview(){
+  const sym=document.getElementById('currency').value||'$';
+  const fn=document.getElementById('fromName').value;
+  document.getElementById('p-fromName').textContent=fn;
+  document.getElementById('p-fromName2').textContent=fn;
+  document.getElementById('p-fromTagline').textContent=document.getElementById('fromTagline').value;
+  document.getElementById('p-invoiceNo').textContent='#'+document.getElementById('invoiceNo').value;
+  const id=document.getElementById('issueDate').value, pd=document.getElementById('paymentDate').value;
+  document.getElementById('p-issueDate').textContent=id?fmtDate(id):'—';
+  document.getElementById('p-paymentDate').textContent=pd?'Payment date: '+fmtDate(pd):'';
+  const fa=document.getElementById('fromAddress').value, fe=document.getElementById('fromEmail').value;
+  document.getElementById('p-fromDetail').innerHTML=nl2br(fa)+(fe?'<br>'+esc(fe):'');
+  document.getElementById('p-toName').textContent=document.getElementById('toName').value;
+  const ta=document.getElementById('toAddress').value, te=document.getElementById('toEmail').value;
+  document.getElementById('p-toDetail').innerHTML=nl2br(ta)+(te?'<br>'+esc(te):'');
+  const tbody=document.getElementById('p-items'); tbody.innerHTML=''; let total=0;
+  items.forEach(item=>{
+    const amt=parseFloat(item.amount||0); total+=amt;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${esc(item.title)}${item.desc?'<div class="sub">'+esc(item.desc)+'</div>':''}</td><td class="r">${fmt(amt,sym)}</td>`;
+    tbody.appendChild(tr);
+  });
+  const ts=fmt(total,sym);
+  document.getElementById('p-total').textContent=ts;
+  document.getElementById('p-total2').textContent=ts;
+  const pm=document.getElementById('payMethod').value, pr=document.getElementById('payRef').value;
+  document.getElementById('p-payInfo').textContent=pm+(pr?' · Ref: '+pr:'');
+  document.getElementById('p-footerLeft').textContent=document.getElementById('fromContact').value;
+  document.getElementById('p-footerRight').textContent=document.getElementById('fromEmail').value;
+}
+function update(){updatePreview();}
+
+async function generatePDF(){
+  const btn=document.getElementById('pdfBtn');
+  btn.textContent='Generating…'; btn.disabled=true;
+  try{
+    // Make sure fonts are loaded
+    if(document.fonts && document.fonts.ready){ await document.fonts.ready; }
+    const invoice=document.getElementById('invoice');
+
+    // Capture the invoice at high resolution
+    const canvas=await html2canvas(invoice,{
+      scale:3,
+      useCORS:true,
+      backgroundColor:'#ffffff',
+      logging:false,
+      windowWidth:invoice.scrollWidth,
+      windowHeight:invoice.scrollHeight,
+    });
+
+    const imgData=canvas.toDataURL('image/jpeg',0.98);
+    const { jsPDF }=window.jspdf;
+
+    // PDF page = exact pixel size of the invoice (no extra white space)
+    const pdf=new jsPDF({
+      orientation:'portrait',
+      unit:'px',
+      format:[canvas.width, canvas.height],
+      hotfixes:['px_scaling'],
+    });
+
+    pdf.addImage(imgData,'JPEG',0,0,canvas.width,canvas.height);
+    pdf.save('invoice-'+document.getElementById('invoiceNo').value+'.pdf');
+  }catch(err){
+    console.error(err);
+    alert('PDF generation failed: '+err.message);
+  }finally{
+    btn.textContent='⬇ Download PDF'; btn.disabled=false;
+  }
+}
+
+function resetForm(){
+  if(!confirm('Reset all fields to defaults?'))return;
+  removeLogo({stopPropagation:()=>{}});
+  document.getElementById('fromName').value='NovaTech Solutions';
+  document.getElementById('fromTagline').value='Software & Digital Services';
+  document.getElementById('fromAddress').value='123 Tech Park, Floor 4\nDhaka, Bangladesh';
+  document.getElementById('fromEmail').value='billing@novatech.io';
+  document.getElementById('fromContact').value='novatech.io · +880 1700-000000';
+  document.getElementById('toName').value='Acme Corporation Ltd.';
+  document.getElementById('toAddress').value='45 Business Avenue\nDhaka, Bangladesh';
+  document.getElementById('toEmail').value='accounts@acmecorp.com';
+  document.getElementById('invoiceNo').value='INV-2026-0047';
+  document.getElementById('currency').value='$';
+  document.getElementById('payMethod').value='Bank Transfer';
+  document.getElementById('payRef').value='TXN-8821-XK';
+  const today=new Date().toISOString().split('T')[0];
+  document.getElementById('issueDate').value=today;
+  document.getElementById('paymentDate').value=today;
+  items=[
+    { title: 'Web Application Development', desc: 'Custom dashboard & admin panel (Phase 1)', amount: '2500' },
+    { title: 'API Integration', desc: 'Third-party payment gateway & CRM sync', amount: '800' },
+    { title: 'Monthly Maintenance & Support', desc: 'May 2026 — bug fixes, updates, uptime monitoring', amount: '200' },
+  ];
+  renderItems(); updatePreview();
+}
+
+const today=new Date().toISOString().split('T')[0];
+document.getElementById('issueDate').value=today;
+document.getElementById('paymentDate').value=today;
+renderItems();
+updatePreview();
+</script>
+</body>
+</html>
